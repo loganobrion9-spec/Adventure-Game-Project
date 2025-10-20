@@ -1,6 +1,14 @@
-#gamefunctions.py
-#Logan OBrion
-#9/28/25
+"""Game Functions Module.
+
+This module has  several functions used in an adventure game.
+It can print a welcome message, shop menu, purchase items, and generate random monsters.
+
+Typical use examples:
+    print_welcome("Logan", 25)
+    print_shop_menu("Apple", 31, "Pear", 1.234)
+    monster = new_random_monster()
+    print(monster)
+"""
 
 import random
 
@@ -11,7 +19,18 @@ def purchase_item(itemPrice,startingMoney,quantityToPurchase=1):
     """
     Attempts to buy quantityToPurchase items given an item price and starting money
     Returns how many items were purchased and how much money remains.
+
+    Parameters:
+        itemPrice (int): The price of one item.
+        startingMoney(int): The player's current money.
+        quantityToPurchase(int, optional): The number of items that the player wants to buy (Defaults to one).
+
+    Returns:
+        tuple[int, int]: A tuple containing the number of items purchased
+        and the amount of money remaining.        
+
     """
+
     max_affordable_items = startingMoney//itemPrice
     num_purchased = min(quantityToPurchase,max_affordable_items)
     leftover_money = startingMoney - (num_purchased * itemPrice)
@@ -20,7 +39,8 @@ def purchase_item(itemPrice,startingMoney,quantityToPurchase=1):
 
 # Defines possible types, with ranges for health, power, and money   
 def new_random_monster():
-    """Creates and returns a randomly generated monster with randomized stats.
+    """
+    Creates and returns a randomly generated monster with randomized stats.
 
     Returns:
         dict: A dictionary containing the monster's name, description, health, power, and money.
@@ -43,70 +63,93 @@ def new_random_monster():
 
 
 def print_welcome(name: str, width: int):
-    """Prints a centered welcome message for the name"""
+    """
+    Prints a centered welcome message for the player.
+
+    Parameters:
+        name (str): The player's name.
+        width (int): The width to center the message within.
+
+    Returns:
+        None
+    """
     message = f"Hello, {name}!"
     print(message.center(width))
 
 
 def print_shop_menu(item1Name: str, item1Price: float, item2Name: str, item2Price: float):
-    """Prints a formatted shop menu with two items and their prices."""
+    """Prints a formatted shop menu with two items and their prices.
+    
+    Parameters:
+        item1Name(str): Name of shop's first item.
+        item1Price(float): Price of shop's first item.
+        item2Name(str): Name of shop's second item.
+        item2Price(float): Price of shop's second item.
+
+    Returns:
+        None
+    """
     print("/" + "-" * 22 + "\\")
     print(f"| {item1Name:<12} {f'${item1Price:.2f}':>8} |")
     print(f"| {item2Name:<12} {f'${item2Price:.2f}':>8} |")
     print("\\" + "-" * 22 + "/")
 
     
-                  
-#item purchase function tests
+def test_functions():
+    """Runs tests for all functions in this module."""
 
-#Default value
-num_purchased, leftover_money = purchase_item(341, 2112)
-print(num_purchased)
-print(leftover_money)
+    #item purchase function tests
+    #Default value
+    num_purchased, leftover_money = purchase_item(341, 2112)
+    print(num_purchased)
+    print(leftover_money)
 
-#Can afford all items
-num_purchased, leftover_money = purchase_item(123, 1000, 3)
-print(num_purchased)
-print(leftover_money)
+    #Can afford all items
+    num_purchased, leftover_money = purchase_item(123, 1000, 3)
+    print(num_purchased)
+    print(leftover_money)
 
-#Can't afford all items
-num_purchased, leftover_money = purchase_item(123, 201, 3)
-print(num_purchased)
-print(leftover_money)
-
-
-#monster fuction tests
-my_monster = new_random_monster()
-print(my_monster['name'])
-print(my_monster['description'])
-print(my_monster['health'])
-print(my_monster['power'])
-print(my_monster['money'])
+    #Can't afford all items
+    num_purchased, leftover_money = purchase_item(123, 201, 3)
+    print(num_purchased)
+    print(leftover_money)
 
 
-my_monster = new_random_monster()
-print(my_monster['name'])
-print(my_monster['description'])
-print(my_monster['health'])
-print(my_monster['power'])
-print(my_monster['money'])
+    #monster fuction tests
+    my_monster = new_random_monster()
+    print(my_monster['name'])
+    print(my_monster['description'])
+    print(my_monster['health'])
+    print(my_monster['power'])
+    print(my_monster['money'])
 
 
-my_monster = new_random_monster()
-print(my_monster['name'])
-print(my_monster['description'])
-print(my_monster['health'])
-print(my_monster['power'])
-print(my_monster['money'])
+    my_monster = new_random_monster()
+    print(my_monster['name'])
+    print(my_monster['description'])
+    print(my_monster['health'])
+    print(my_monster['power'])
+    print(my_monster['money'])
 
 
-#print_welcome tests
-print_welcome("Jeff", 20)
-print_welcome("Audrey", 30)
-print_welcome("Logan", 25)
+    my_monster = new_random_monster()
+    print(my_monster['name'])
+    print(my_monster['description'])
+    print(my_monster['health'])
+    print(my_monster['power'])
+    print(my_monster['money'])
 
 
-#print_shop_menu tests
-print_shop_menu("Apple", 31, "Pear", 1.234)
-print_shop_menu("Egg", 0.23, "Bag of Oats", 12.34)
-print_shop_menu("Donut", 2.5, "Orange Juice", 2.0)
+    #print_welcome tests
+    print_welcome("Jeff", 20)
+    print_welcome("Audrey", 30)
+    print_welcome("Logan", 25)
+
+
+    #print_shop_menu tests
+    print_shop_menu("Apple", 3, "Pear", 1.234)
+    print_shop_menu("Egg", 0.23, "Bag of Oats", 12.34)
+    print_shop_menu("Donut", 2.5, "Orange Juice", 2.0)
+
+if __name__ == "__main__":
+    test_functions()
