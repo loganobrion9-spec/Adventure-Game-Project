@@ -62,6 +62,44 @@ def new_random_monster():
     return monster
 
 
+def fight_monster(player_hp, player_gold, monster):
+    """Fight loop"""
+    character_health = player_hp
+    monster_health = monster["health"]
+    character_damage = random.randint(25, 75)
+    monster_damage = monster["power"]
+
+    print(f"\nA {monster['name']} appears! {monster['description']}")
+
+    while character_health > 0 and monster_health > 0:
+        action = input("\n1) Attack  2) Flee: ")
+
+        if action == "1":
+            monster_health = monster_health - character_damage
+            character_health = character_health - monster_damage
+            print(f"You hit the {monster['name']} for {character_damage} damage.")
+            print(f"The {monster['name']} hit you for {monster_damage} damage.")
+
+        elif action == "2":
+            print("You run away")
+            break
+        else:
+            print("That's not a command, silly.")
+
+        if character_health <= 0:
+            print('You got too scared and ran away')
+            character_health = 1
+        if monster_health <= 0:
+            print(f"You defeated the {monster['name']}!")
+            player_gold += monster["money"]
+            print(f"You found {monster['money']} gold!")
+
+    return character_health, player_gold
+
+
+
+    
+
 def print_welcome(name: str, width: int):
     """
     Prints a centered welcome message for the player.
