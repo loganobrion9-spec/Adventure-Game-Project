@@ -62,34 +62,65 @@ def new_random_monster():
     return monster
 
 
-def fight_monster(player_hp, player_gold, monster):
+def fight_monster(player, player_hp, player_gold, monster):
     """Fight loop"""
     character_health = player_hp
     monster_health = monster["health"]
-    character_damage = random.randint(25, 75)
     monster_damage = monster["power"]
 
     print(f"\nA {monster['name']} appears! {monster['description']}")
+
+    if player and check_special_item(player):
+        print("The monster is instantly defeated by your special item!")
+        player_gold += monster["money"]
+        print(f"You found {monster['money']} gold!")
+        return character_health, player_gold
 
     while character_health > 0 and monster_health > 0:
         action = input("\n1) Attack  2) Flee: ")
 
         if action == "1":
+
+            character_damage = random.randint(25, 75)
+        
+            if player.get("equippedWeapon"):
+                weapon = player["equippedWeapon"]
+                character_damage += weapon.get("damage_boost", 0)
+                weapon["currentDurability"] -= 1
+                print(f"You attack with {weapon['name']}! Durability left: {weapon['currentDurability']}")
+
+                # Remove weapon if durability reaches 0
+                if weapon["currentDurability"] <= 0:
+                        print(f"Your {weapon['name']} broke!")
+                        player["inventory"].remove(weapon)
+                        player["equippedWeapon"] = None
+
+                
             monster_health = monster_health - character_damage
             character_health = character_health - monster_damage
+
+            if character_health < 0:
+                character_health = 0
+            if monster_health < 0:
+                monster_health = 0
+                
             print(f"You hit the {monster['name']} for {character_damage} damage.")
             print(f"The {monster['name']} hit you for {monster_damage} damage.")
 
+
+
         elif action == "2":
-            print("You run away")
-            break
+            print("You ran away")
+            return character_health, player_gold
         else:
             print("That's not a command, silly.")
 
-        if character_health <= 0:
-            print('You got too scared and ran away')
+    if character_health <= 0 and monster_health > 0:
+            print('You lost.')
             character_health = 1
-        if monster_health <= 0:
+            
+            
+    if monster_health <= 0:
             print(f"You defeated the {monster['name']}!")
             player_gold += monster["money"]
             print(f"You found {monster['money']} gold!")
@@ -131,6 +162,79 @@ def print_shop_menu(item1Name: str, item1Price: float, item2Name: str, item2Pric
     print(f"| {item1Name:<12} {f'${item1Price:.2f}':>8} |")
     print(f"| {item2Name:<12} {f'${item2Price:.2f}':>8} |")
     print("\\" + "-" * 22 + "/")
+
+
+def get_shop_items():
+    """Return a list of purchasable items"""
+    return [
+        {"name": "Excalibur", "type": "weapon", "price": 100, "damage_boost": 20, "maxDurability": 10, "currentDurability": 10},
+        {"name": "Holy Hand Grenade of Antioch", "type": "special", "price": 500, "note": "Blows one of thine enemies to tiny bits, in thy mercy."}
+        ]
+
+
+def visit_shop(player):
+    """Lets player buy items from the shop"""
+    shop_items = get_shop_items()
+    print("\nWelcome to the shop!")
+    print(f"You have {player['gold']} gold.")
+    print("Available items:")
+
+    for i, item in enumerate(shop_items, 1):
+        print(f"{i}) {item['name'].title()} - {item['price']} gold")
+
+    choice = input("Choose an item to buy or press enter to leave:")
+    if not choice.isdigit():
+        print("You are leaving the shop. Bye-Bye!")
+        return player
+    choice = int(choice)
+    if 1 <= choice <= len(shop_items):
+        item = shop_items[choice - 1]
+        if player["gold"] >= item["price"]:
+            player["gold"] -= item["price"]
+            player["inventory"].append(item)
+            print(f"You bought {item['name']}! Remaining gold: {player['gold']}")
+
+        else:
+            print("You don't have enough gold. Sorry!")
+    else:
+        print("That's not a choice")
+    return player
+
+def equip_weapon(player):
+    weapons = [item for item in player["inventory"] if item["type"] == "weapon"]
+    if not weapons:
+        print("You do not have any weapons.")
+        return
+
+    print("\nChoose a weapon to equip:")
+    for i, weapon in enumerate(weapons, 1):
+        print(f"{i}) {weapon['name']} (Durability: {weapon['currentDurability']}/{weapon['maxDurability']})")
+              
+    choice = input("Enter number or press Enter to cancel: ")
+    if not choice.isdigit():
+        print("No weapon equipped.")
+        return
+
+    choice = int(choice)
+    if 1 <= choice <= len(weapons):
+        player["equippedWeapon"] = weapons[choice-1]
+        print(f"You equipped {weapons[choice - 1]['name']}!")
+
+
+def check_special_item(player):
+    for item in player["inventory"]:
+        if item["type"] == "special":
+            use = input(f"You have {item['name']} that can instantly defeat the monster. Use it? (y/n): ").lower()
+            if use == "y":
+                player["inventory"].remove(item)
+                print(f"You used {item['name']}! The monster is defeated instantly.")
+                return True
+    return False
+    
+        
+        
+    
+    
 
     
 def test_functions():
