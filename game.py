@@ -9,6 +9,58 @@ from the gamefunctions module.
 
 import gamefunctions
 import random
+import save_load
+
+def start_game():
+    """Prompt player to start a new game or load a previous one"""
+    print("1) Start New Game")
+    print("2) Load Saved Game")
+    choice = input("Choose an option: ").strip()
+
+    if choice == "1":
+        player = {
+            "hp": 150,
+            "gold": 1000,
+            "inventory": [],
+            "equippedWeapon": None
+            }
+    elif choice == "2":
+        filename = input("Enter filename to load (default: savegame.json): ").strip() or "savegame.json"
+        player = save_load.load_game(filename)
+        if player is None:
+            print("Starting a new game instead")
+            player = {
+                "hp": 150,
+                "gold": 1000,
+                "inventory": [],
+                "equippedWeapon": None
+                }
+    else:
+        print("Invalid choice, starting new game instead")
+        player = {
+            "hp": 150,
+            "gold": 1000,
+            "inventory": [],
+            "equippedWeapon": None
+            }
+    return player
+
+def game_menu(player):
+    """In game menu"""
+    while True:
+        print("1) Continue adventure")
+        print("2) Save and Quit")
+        choice = input("Choose an option: ").strip()
+
+        if choice == "1":
+            return
+        elif choice == "2":
+            filename = input("Enter filename to save (default: savegame.json): ").strip() or "savegame.json"
+            save_load.save_game(player, filename)
+            print("Bye-bye!")
+            return "quit"
+        else:
+            print("Invalid option.")
 
 def main():
     """Main game loop"""
@@ -20,13 +72,9 @@ def main():
     gamefunctions.print_welcome(name, 40)
 
 
-    player = {
-        "name": name,
-        "hp": 150,
-        "gold": 1000,
-        "inventory": [],
-        "equippedWeapon": None
-    }
+    player = start_game()
+
+    
 
 #Main game loop
 
@@ -39,7 +87,8 @@ def main():
         print("3) Visit Shop")
         print("4) Equip Weapon")
         print("5) Show Inventory")
-        print("6) Quit")
+        print("6) Game Menu (Save and Quit)")
+        print("7) Quit without saving")
 
         choice = input("Choose an option:")
 
@@ -79,11 +128,16 @@ def main():
                 print("Equipped Weapon: None")
 
         elif choice == "6":
+            result = game_menu(player)
+            if result == "quit":
+                break 
+
+        elif choice == "7":
             print("See you again soon!")
             break
 
         else:
-            print("You have to enter from 1-6, man.")
+            print("You have to enter from 1-7, man.")
             
         
     
