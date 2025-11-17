@@ -22,7 +22,8 @@ def start_game():
             "hp": 150,
             "gold": 1000,
             "inventory": [],
-            "equippedWeapon": None
+            "equippedWeapon": None,
+             "map_state": {}
             }
     elif choice == "2":
         filename = input("Enter filename to load (default: savegame.json): ").strip() or "savegame.json"
@@ -33,15 +34,20 @@ def start_game():
                 "hp": 150,
                 "gold": 1000,
                 "inventory": [],
-                "equippedWeapon": None
+                "equippedWeapon": None,
+                 "map_state": {}
                 }
+        if "map_state" not in player:
+            player["map_state"] = {}
+            
     else:
         print("Invalid choice, starting new game instead")
         player = {
             "hp": 150,
             "gold": 1000,
             "inventory": [],
-            "equippedWeapon": None
+            "equippedWeapon": None,
+            "map_state": {}
             }
     return player
 
@@ -82,7 +88,7 @@ def main():
         print("\nYou are in town.")
         print(f"Current HP: {player['hp']}, Gold: {player['gold']}")
         print("What would you like to do?")
-        print("1) Leave town (Fight Monster)")
+        print("1) Leave town (Fight Monster / Explore Map)")
         print("2) Sleep (Restore HP for 5 Gold)")
         print("3) Visit Shop")
         print("4) Equip Weapon")
@@ -93,9 +99,14 @@ def main():
         choice = input("Choose an option:")
 
         if choice == "1":
-            monster = gamefunctions.new_random_monster()
-            player["hp"], player["gold"] = gamefunctions.fight_monster(player, player["hp"], player["gold"], monster)
-            
+            # Open map
+            action, player["map_state"] = gamefunctions.open_map(player, player["map_state"])
+            if action == "monster":
+                monster = gamefunctions.new_random_monster()
+                player["hp"], player["gold"] = gamefunctions.fight_monster(
+                    player, player["hp"], player["gold"], monster
+                )
+            # else: action == "town", player returns to town safely
         elif choice == "2":
             if player["gold"] >= 5:
                  player["gold"] = player["gold"] - 5

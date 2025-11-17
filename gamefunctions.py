@@ -11,6 +11,129 @@ Typical use examples:
 """
 
 import random
+import pygame
+import sys
+
+TILE = 32
+GRID_SIZE = 10
+SCREEN_SIZE = TILE * GRID_SIZE
+PLAYER_COLOR = (0, 120, 200)  # Blue player square
+TOWN_COLOR = (0, 200, 0)      # Green circle for town
+MONSTER_COLOR = (200, 0, 0)   # Red circle for monster
+GRID_LINE_COLOR = (50, 50, 50)
+BG_COLOR = (0, 0, 0)
+
+def open_map(player, map_state):
+    """
+    Launch a pygame map and return (action, map_state)
+    action: "town" or "monster"
+    """
+
+    # Helper to ensure stored values are lists
+    def _as_list(v):
+        return list(v) if isinstance(v, (tuple, list)) else [0, 0]
+
+    # Load map state (or defaults)
+    player_pos = _as_list(map_state.get("player_pos", [0, 0]))
+    town_pos = _as_list(map_state.get("town_pos", [0, 0]))
+    monster_pos = _as_list(map_state.get("monster_pos", [GRID_SIZE - 1, GRID_SIZE - 1]))
+    monster_alive = bool(map_state.get("monster_alive", True))
+
+    pygame.init()
+    screen = pygame.display.set_mode((SCREEN_SIZE, SCREEN_SIZE))
+    pygame.display.set_caption("Map")
+    clock = pygame.time.Clock()
+    font = pygame.font.SysFont(None, 18)
+
+    left_town = False
+    running = True
+
+    while running:
+        for event in pygame.event.get():
+
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit(0)
+
+            elif event.type == pygame.KEYDOWN:
+                new_x, new_y = player_pos[0], player_pos[1]
+
+                if event.key == pygame.K_UP:
+                    new_y = max(0, player_pos[1] - 1)
+                elif event.key == pygame.K_DOWN:
+                    new_y = min(GRID_SIZE - 1, player_pos[1] + 1)
+                elif event.key == pygame.K_LEFT:
+                    new_x = max(0, player_pos[0] - 1)
+                elif event.key == pygame.K_RIGHT:
+                    new_x = min(GRID_SIZE - 1, player_pos[0] + 1)
+                else:
+                    continue
+
+                # Apply movement
+                if (new_x, new_y) != (player_pos[0], player_pos[1]):
+                    player_pos[0], player_pos[1] = new_x, new_y
+
+                    # Check if returning to town
+                    if [player_pos[0], player_pos[1]] == town_pos:
+                        if left_town:
+                            map_state["player_pos"] = player_pos
+                            map_state["town_pos"] = town_pos
+                            map_state["monster_pos"] = monster_pos
+                            map_state["monster_alive"] = monster_alive
+                            pygame.quit()
+                            return ("town", map_state)
+                    else:
+                        left_town = True
+
+                    # Check monster encounter
+                    if monster_alive and player_pos == monster_pos:
+                        map_state["player_pos"] = player_pos
+                        map_state["town_pos"] = town_pos
+                        map_state["monster_pos"] = monster_pos
+                        map_state["monster_alive"] = monster_alive
+                        pygame.quit()
+                        return ("monster", map_state)
+
+        # DRAWING
+        screen.fill(BG_COLOR)
+
+        # Grid
+        for gx in range(GRID_SIZE):
+            for gy in range(GRID_SIZE):
+                rect = pygame.Rect(gx * TILE, gy * TILE, TILE, TILE)
+                pygame.draw.rect(screen, GRID_LINE_COLOR, rect, 1)
+
+        # Town
+        town_center = (
+            town_pos[0] * TILE + TILE // 2,
+            town_pos[1] * TILE + TILE // 2
+        )
+        pygame.draw.circle(screen, TOWN_COLOR, town_center, TILE // 3)
+
+        # Monster
+        if monster_alive:
+            monster_center = (
+                monster_pos[0] * TILE + TILE // 2,
+                monster_pos[1] * TILE + TILE // 2
+            )
+            pygame.draw.circle(screen, MONSTER_COLOR, monster_center, TILE // 3)
+
+        # Player
+        player_rect = pygame.Rect(player_pos[0] * TILE, player_pos[1] * TILE, TILE, TILE)
+        pygame.draw.rect(screen, PLAYER_COLOR, player_rect)
+
+        # Debug overlay
+        info = f"Pos: {player_pos}  Town: {town_pos}  Monster: {monster_pos}"
+        text = font.render(info, True, (255, 255, 255))
+        screen.blit(text, (4, SCREEN_SIZE - 18))
+
+        pygame.display.flip()
+        clock.tick(60)
+
+    # Fallback
+    map_state["player_pos"] = player_pos
+    pygame.quit()
+    return ("town", map_state)
 
 
 # Attempts to buy quantityToPurchase items given an item price and starting money.
@@ -45,9 +168,9 @@ def new_random_monster():
     Returns:
         dict: A dictionary containing the monster's name, description, health, power, and money.
     """
-    monsters = [{"name": "Dragon", "description": "A huge dragon that can breathe fire.", "health_range": (500,1000), "power_range": (50,80), "money_range": (200,500)},
-                {"name": "Gnome", "description": "A small but mischievious gnome.", "health_range": (50,100), "power_range": (10,20), "money_range": (100,150)},
-                {"name": "Cyclops", "description": "An ugly one-eyed beast with a big club.", "health_range": (200,300), "power_range": (30,40), "money_range": (50,100)}]
+    monsters = [{"name": "Killer Rabbit of Caerbannog", "description": "A deceptively cute but deadly rabbit with razor sharp teeth.", "health_range": (500,1000), "power_range": (50,80), "money_range": (200,500)},
+                {"name": "Insulting Frenchman ", "description": "A castle guard who doesn't take kindly to you. Stay upwind of him!", "health_range": (50,100), "power_range": (10,20), "money_range": (100,150)},
+                {"name": "Three-Headed Giant", "description": "A giant with three heads that can't seem to agree with each other.", "health_range": (200,300), "power_range": (30,40), "money_range": (50,100)}]
 
     # Randomly select one of the monster templates
     chosen = random.choice(monsters)
@@ -110,13 +233,13 @@ def fight_monster(player, player_hp, player_gold, monster):
 
 
         elif action == "2":
-            print("You ran away")
+            print("You get too scared. An onlooker to the battle, Sir Robin, joins you momentarily as you bravely run back to town.")
             return character_health, player_gold
         else:
             print("That's not a command, silly.")
 
     if character_health <= 0 and monster_health > 0:
-            print('You lost.')
+            print('You lost. Never underestimate an opponent!')
             character_health = 1
             
             
