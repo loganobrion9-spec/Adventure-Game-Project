@@ -13,6 +13,7 @@ Typical use examples:
 import random
 import pygame
 import sys
+from wanderingMonster import WanderingMonster
 
 TILE = 32
 GRID_SIZE = 10
@@ -27,6 +28,12 @@ def open_map(player, map_state):
     """
     Launch a pygame map and return (action, map_state)
     action: "town" or "monster"
+    map_state: persistent map dictionary, contains:
+        - player_pos: [x,y]
+        - town_pos: [x,y]
+        - monsters: [ {serializable monster dict}, ... ]
+        - player_move_count: int  (to track every-other-move)
+        - encounter_idx: index of monster to encounter (set when returning "monster")
     """
 
     # Helper to ensure stored values are lists
@@ -36,8 +43,24 @@ def open_map(player, map_state):
     # Load map state (or defaults)
     player_pos = _as_list(map_state.get("player_pos", [0, 0]))
     town_pos = _as_list(map_state.get("town_pos", [0, 0]))
-    monster_pos = _as_list(map_state.get("monster_pos", [GRID_SIZE - 1, GRID_SIZE - 1]))
-    monster_alive = bool(map_state.get("monster_alive", True))
+    monsters_data = map_state.get("monsters", None)
+    player_move_count = int(map_state.get("player_move_count", 0))
+
+    # If no monsters present or list empty, create two monsters
+    monsters = []
+    if monsters_data:
+        # restore objects (but keep them serializable via dicts)
+        for md in monsters_data:
+            monsters.append(WanderingMonster.from_dict(md))
+    else:
+        # create two monsters not on player or town
+        avoid = [tuple(player_pos), tuple(town_pos)]
+        m1 = WanderingMonster.random_at(GRID_SIZE, town_pos, avoid_positions=avoid)
+        monsters.append(m1)
+        # Add second monster; ensure not same location
+        avoid.append((m1.x, m1.y))
+        m2 = WanderingMonster.random_at(GRID_SIZE, town_pos, avoid_positions=avoid)
+        monsters.append(m2)
 
     pygame.init()
     screen = pygame.display.set_mode((SCREEN_SIZE, SCREEN_SIZE))
@@ -48,10 +71,19 @@ def open_map(player, map_state):
     left_town = False
     running = True
 
+    # Helper to serialize monsters into map_state for persistence
+    def serialize_monsters(lst):
+        return [m.to_dict() for m in lst]
+
     while running:
         for event in pygame.event.get():
 
             if event.type == pygame.QUIT:
+                # persist state before quitting program
+                map_state["player_pos"] = player_pos
+                map_state["town_pos"] = town_pos
+                map_state["monsters"] = serialize_monsters(monsters)
+                map_state["player_move_count"] = player_move_count
                 pygame.quit()
                 sys.exit(0)
 
@@ -72,27 +104,51 @@ def open_map(player, map_state):
                 # Apply movement
                 if (new_x, new_y) != (player_pos[0], player_pos[1]):
                     player_pos[0], player_pos[1] = new_x, new_y
+                    player_move_count += 1
 
-                    # Check if returning to town
+                    # If player returned to town tile and has left previously, go back to town
                     if [player_pos[0], player_pos[1]] == town_pos:
                         if left_town:
                             map_state["player_pos"] = player_pos
                             map_state["town_pos"] = town_pos
-                            map_state["monster_pos"] = monster_pos
-                            map_state["monster_alive"] = monster_alive
+                            map_state["monsters"] = serialize_monsters(monsters)
+                            map_state["player_move_count"] = player_move_count
                             pygame.quit()
                             return ("town", map_state)
                     else:
                         left_town = True
 
-                    # Check monster encounter
-                    if monster_alive and player_pos == monster_pos:
-                        map_state["player_pos"] = player_pos
-                        map_state["town_pos"] = town_pos
-                        map_state["monster_pos"] = monster_pos
-                        map_state["monster_alive"] = monster_alive
-                        pygame.quit()
-                        return ("monster", map_state)
+                    # After player moves, move monsters every other player move
+                    if player_move_count % 2 == 0:
+                        # build list of occupied positions to prevent monster stacking (except on player)
+                        occupied = [(m.x, m.y) for m in monsters if m.alive]
+                        for m in monsters:
+                            # pass current occupied positions excluding this monster's own pos
+                            others = [p for p in occupied if p != (m.x, m.y)]
+                            m.move(GRID_SIZE, town_pos, player_pos, occupied_positions=others)
+
+                        # after moving, see if any monster ended up on the player
+                        for idx, m in enumerate(monsters):
+                            if m.alive and (m.x, m.y) == tuple(player_pos):
+                                # store serialized monsters + encounter index for the caller
+                                map_state["player_pos"] = player_pos
+                                map_state["town_pos"] = town_pos
+                                map_state["monsters"] = serialize_monsters(monsters)
+                                map_state["player_move_count"] = player_move_count
+                                map_state["encounter_idx"] = idx
+                                pygame.quit()
+                                return ("monster", map_state)
+
+                    # If player stepped onto a monster tile, trigger encounter
+                    for idx, m in enumerate(monsters):
+                        if m.alive and (m.x, m.y) == tuple(player_pos):
+                            map_state["player_pos"] = player_pos
+                            map_state["town_pos"] = town_pos
+                            map_state["monsters"] = serialize_monsters(monsters)
+                            map_state["player_move_count"] = player_move_count
+                            map_state["encounter_idx"] = idx
+                            pygame.quit()
+                            return ("monster", map_state)
 
         # DRAWING
         screen.fill(BG_COLOR)
@@ -110,20 +166,18 @@ def open_map(player, map_state):
         )
         pygame.draw.circle(screen, TOWN_COLOR, town_center, TILE // 3)
 
-        # Monster
-        if monster_alive:
-            monster_center = (
-                monster_pos[0] * TILE + TILE // 2,
-                monster_pos[1] * TILE + TILE // 2
-            )
-            pygame.draw.circle(screen, MONSTER_COLOR, monster_center, TILE // 3)
+        # Monsters: draw each alive monster using its color
+        for m in monsters:
+            if m.alive:
+                monster_center = (m.x * TILE + TILE // 2, m.y * TILE + TILE // 2)
+                pygame.draw.circle(screen, m.color, monster_center, TILE // 3)
 
         # Player
         player_rect = pygame.Rect(player_pos[0] * TILE, player_pos[1] * TILE, TILE, TILE)
         pygame.draw.rect(screen, PLAYER_COLOR, player_rect)
 
         # Debug overlay
-        info = f"Pos: {player_pos}  Town: {town_pos}  Monster: {monster_pos}"
+        info = f"Pos: {player_pos}  Town: {town_pos}  Monsters: {[ (m.x,m.y,m.name,m.alive) for m in monsters ]}"
         text = font.render(info, True, (255, 255, 255))
         screen.blit(text, (4, SCREEN_SIZE - 18))
 
@@ -132,8 +186,17 @@ def open_map(player, map_state):
 
     # Fallback
     map_state["player_pos"] = player_pos
+    map_state["town_pos"] = town_pos
+    map_state["monsters"] = serialize_monsters(monsters)
+    map_state["player_move_count"] = player_move_count
     pygame.quit()
     return ("town", map_state)
+
+
+# Return a WanderingMonster instance (unplaced) for other uses
+def new_random_monster():
+    """Return a freshly randomized WanderingMonster instance (not placed on map)."""
+    return WanderingMonster.random_at(GRID_SIZE, (0, 0))
 
 
 # Attempts to buy quantityToPurchase items given an item price and starting money.
@@ -160,29 +223,6 @@ def purchase_item(itemPrice,startingMoney,quantityToPurchase=1):
     return num_purchased, leftover_money
 
 
-# Defines possible types, with ranges for health, power, and money   
-def new_random_monster():
-    """
-    Creates and returns a randomly generated monster with randomized stats.
-
-    Returns:
-        dict: A dictionary containing the monster's name, description, health, power, and money.
-    """
-    monsters = [{"name": "Killer Rabbit of Caerbannog", "description": "A deceptively cute but deadly rabbit with razor sharp teeth.", "health_range": (500,1000), "power_range": (50,80), "money_range": (200,500)},
-                {"name": "Insulting Frenchman ", "description": "A castle guard who doesn't take kindly to you. Stay upwind of him!", "health_range": (50,100), "power_range": (10,20), "money_range": (100,150)},
-                {"name": "Three-Headed Giant", "description": "A giant with three heads that can't seem to agree with each other.", "health_range": (200,300), "power_range": (30,40), "money_range": (50,100)}]
-
-    # Randomly select one of the monster templates
-    chosen = random.choice(monsters)
-    monster = {
-        "name": chosen["name"],
-        "description": chosen["description"],
-        "health": random.randint(*chosen["health_range"]),
-        "power": random.randint(*chosen["power_range"]),
-        "money": random.randint(*chosen["money_range"])
-    }
-
-    return monster
 
 
 def fight_monster(player, player_hp, player_gold, monster):

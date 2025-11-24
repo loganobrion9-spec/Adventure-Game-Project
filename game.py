@@ -11,7 +11,7 @@ import gamefunctions
 import random
 import save_load
 
-def start_game():
+def start_game(name):
     """Prompt player to start a new game or load a previous one"""
     print("1) Start New Game")
     print("2) Load Saved Game")
@@ -23,8 +23,10 @@ def start_game():
             "gold": 1000,
             "inventory": [],
             "equippedWeapon": None,
-             "map_state": {}
+            "map_state": {},
+            "name": name
             }
+        
     elif choice == "2":
         filename = input("Enter filename to load (default: savegame.json): ").strip() or "savegame.json"
         player = save_load.load_game(filename)
@@ -35,8 +37,10 @@ def start_game():
                 "gold": 1000,
                 "inventory": [],
                 "equippedWeapon": None,
-                 "map_state": {}
+                "map_state": {},
+                "name": name
                 }
+            
         if "map_state" not in player:
             player["map_state"] = {}
             
@@ -47,7 +51,8 @@ def start_game():
             "gold": 1000,
             "inventory": [],
             "equippedWeapon": None,
-            "map_state": {}
+            "map_state": {},
+            "name": name
             }
     return player
 
@@ -78,7 +83,7 @@ def main():
     gamefunctions.print_welcome(name, 40)
 
 
-    player = start_game()
+    player = start_game(name)
 
     
 
@@ -99,14 +104,25 @@ def main():
         choice = input("Choose an option:")
 
         if choice == "1":
-            # Open map
             action, player["map_state"] = gamefunctions.open_map(player, player["map_state"])
+
             if action == "monster":
-                monster = gamefunctions.new_random_monster()
-                player["hp"], player["gold"] = gamefunctions.fight_monster(
-                    player, player["hp"], player["gold"], monster
-                )
-            # else: action == "town", player returns to town safely
+                idx = player["map_state"].get("encounter_idx")
+                if idx is not None:
+                    m = player["map_state"]["monsters"][idx]  # dict version
+                    monster = m  # fight_monster expects a dict
+
+                    # fight
+                    player["hp"], player["gold"] = gamefunctions.fight_monster(
+                        player, player["hp"], player["gold"], monster
+                    )
+
+                    # If monster died, mark it dead in map_state
+                    if monster["health"] <= 0:
+                        player["map_state"]["monsters"][idx]["alive"] = False
+
+                continue
+            
         elif choice == "2":
             if player["gold"] >= 5:
                  player["gold"] = player["gold"] - 5
@@ -150,23 +166,7 @@ def main():
         else:
             print("You have to enter from 1-7, man.")
             
-        
-    
-"""
-    # Show shop menu
-    print("\nWelcome to the shop!")
-    gamefunctions.print_shop_menu("Donut", 2.5, "Apple", 3)
 
-    # Try purchasing something
-    money = 100
-    print(f"\nYou have ${money}.")
-    num_purchased, money_left = gamefunctions.purchase_item(2.5, money, 3)
-    print(f"You bought {num_purchased} items and have ${money_left} left.")
 
-    # Generate a random monster
-    monster = gamefunctions.new_random_monster()
-    print("\nA monster appears!")
-    print(monster)
-"""
 if __name__ == "__main__":
     main()
