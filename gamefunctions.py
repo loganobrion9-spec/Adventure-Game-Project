@@ -1,19 +1,31 @@
 """Game Functions Module.
 
 This module has  several functions used in an adventure game.
-It can print a welcome message, shop menu, purchase items, and generate random monsters.
 
-Typical use examples:
-    print_welcome("Logan", 25)
-    print_shop_menu("Apple", 31, "Pear", 1.234)
-    monster = new_random_monster()
-    print(monster)
 """
 
 import random
 import pygame
 import sys
 from wanderingMonster import WanderingMonster
+TILE_SIZE = 32
+
+def load_image(path, fallback_color, size=(32, 32)):
+    """
+    Attempts to load an image. If it fails, returns a simple colored rectangle.
+    Images are scaled to 'size' so they fit exactly in one tile.
+    """
+    try:
+        image = pygame.image.load(path).convert_alpha()
+        image = pygame.transform.scale(image, size)  # <-- THE FIX
+        return image
+    except Exception as e:
+        print(f"WARNING: Could not load {path}. Using fallback rectangle. Error: {e}")
+        surf = pygame.Surface(size)
+        surf.fill(fallback_color)
+        return surf
+
+
 
 TILE = 32
 GRID_SIZE = 10
@@ -46,28 +58,33 @@ def open_map(player, map_state):
     monsters_data = map_state.get("monsters", None)
     player_move_count = int(map_state.get("player_move_count", 0))
 
+    pygame.init()
+    screen = pygame.display.set_mode((SCREEN_SIZE, SCREEN_SIZE))
+    # Load images with fallback shapes
+    player_img = load_image("images/player.png", PLAYER_COLOR, size=(TILE, TILE))
+    monster_img = load_image("images/monster.png", MONSTER_COLOR, size=(TILE, TILE))
+    town_img = load_image("images/town.png", TOWN_COLOR, size=(TILE, TILE))
+    pygame.display.set_caption("Map")
+    clock = pygame.time.Clock()
+    font = pygame.font.SysFont(None, 18)
+
     # If no monsters present or list empty, create two monsters
     monsters = []
     if monsters_data:
         # restore objects (but keep them serializable via dicts)
         for md in monsters_data:
-            monsters.append(WanderingMonster.from_dict(md))
+            monsters.append(WanderingMonster.from_dict(md, tile_size=TILE_SIZE))
+
     else:
         # create two monsters not on player or town
         avoid = [tuple(player_pos), tuple(town_pos)]
-        m1 = WanderingMonster.random_at(GRID_SIZE, town_pos, avoid_positions=avoid)
+        m1 = WanderingMonster.random_at(GRID_SIZE, town_pos, avoid_positions=avoid, tile_size=TILE_SIZE)
+
         monsters.append(m1)
         # Add second monster; ensure not same location
         avoid.append((m1.x, m1.y))
-        m2 = WanderingMonster.random_at(GRID_SIZE, town_pos, avoid_positions=avoid)
+        m2 = WanderingMonster.random_at(GRID_SIZE, town_pos, avoid_positions=avoid, tile_size=TILE_SIZE)
         monsters.append(m2)
-
-    pygame.init()
-    screen = pygame.display.set_mode((SCREEN_SIZE, SCREEN_SIZE))
-    pygame.display.set_caption("Map")
-    clock = pygame.time.Clock()
-    font = pygame.font.SysFont(None, 18)
-
     left_town = False
     running = True
 
@@ -160,21 +177,17 @@ def open_map(player, map_state):
                 pygame.draw.rect(screen, GRID_LINE_COLOR, rect, 1)
 
         # Town
-        town_center = (
-            town_pos[0] * TILE + TILE // 2,
-            town_pos[1] * TILE + TILE // 2
-        )
-        pygame.draw.circle(screen, TOWN_COLOR, town_center, TILE // 3)
+        screen.blit(town_img, (town_pos[0] * TILE, town_pos[1] * TILE))
 
-        # Monsters: draw each alive monster using its color
+
         for m in monsters:
             if m.alive:
-                monster_center = (m.x * TILE + TILE // 2, m.y * TILE + TILE // 2)
-                pygame.draw.circle(screen, m.color, monster_center, TILE // 3)
+                screen.blit(m.image, (m.x * TILE, m.y * TILE))
+
 
         # Player
-        player_rect = pygame.Rect(player_pos[0] * TILE, player_pos[1] * TILE, TILE, TILE)
-        pygame.draw.rect(screen, PLAYER_COLOR, player_rect)
+        screen.blit(player_img, (player_pos[0] * TILE, player_pos[1] * TILE))
+
 
         # Debug overlay
         info = f"Pos: {player_pos}  Town: {town_pos}  Monsters: {[ (m.x,m.y,m.name,m.alive) for m in monsters ]}"

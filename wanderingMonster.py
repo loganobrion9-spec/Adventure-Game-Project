@@ -1,13 +1,32 @@
 # wanderingMonster.py
 import random
+import pygame
+
+def load_image(path, size=None):
+    """Load and optionally scale an image."""
+    img = pygame.image.load(path).convert_alpha()
+    if size:
+        img = pygame.transform.scale(img, size)
+    return img
+
+def create_fallback_surface(color, size):
+    """Create a simple colored rectangle when image is missing."""
+    surf = pygame.Surface((size, size))
+    surf.fill(color)
+    return surf
 
 # Colors for pygame (R,G,B)
 MONSTER_COLORS = {
     "Killer Rabbit of Caerbannog": (200, 0, 0),   # red
     "Insulting Frenchman": (150, 0, 200),        # purple
     "Three-Headed Giant": (0, 200, 0),           # green
-    "Slime": (0, 150, 50),
-    "Zombie": (80, 200, 80),
+}
+
+# Image paths for each monster type
+MONSTER_IMAGES = {
+    "Killer Rabbit of Caerbannog": "images/monster.png",
+    "Insulting Frenchman": "images/Frenchman.png",
+    "Three-Headed Giant": "images/ThreeHeadedGiant.png",
 }
 
 _MONSTER_TEMPLATES = [
@@ -38,8 +57,7 @@ _MONSTER_TEMPLATES = [
 class WanderingMonster:
     """Represents a single wandering monster on the grid."""
 
-    def __init__(self, x=0, y=0, template=None):
-        # choose template if not provided
+    def __init__(self, x=0, y=0, template=None, tile_size=32):
         if template is None:
             template = random.choice(_MONSTER_TEMPLATES)
 
@@ -54,6 +72,22 @@ class WanderingMonster:
 
         # color fallback
         self.color = MONSTER_COLORS.get(self.name, (200, 0, 0))
+
+        # load monster-specific image
+        self.image = self.load_monster_image(tile_size)
+
+    def load_monster_image(self, tile_size):
+        """Loads a monster-specific image or a fallback colored tile."""
+        path = MONSTER_IMAGES.get(self.name, None)
+        if path:
+            try:
+                return load_image(path, size=(tile_size, tile_size))
+
+            except Exception:
+                pass  # fall through to fallback
+
+        # fallback: colored box
+        return create_fallback_surface(self.color, tile_size)
 
     def to_dict(self):
         """Return a serializable dict for storing in map_state."""
@@ -70,15 +104,20 @@ class WanderingMonster:
         }
 
     @classmethod
-    def from_dict(cls, d):
-        """Create a WanderingMonster-like object from a dict (used to move/draw)."""
-        inst = cls(d.get("x", 0), d.get("y", 0), template={
-            "name": d.get("name"),
-            "description": d.get("description"),
-            "health_range": (d.get("health", 0), d.get("health", 0)),
-            "power_range": (d.get("power", 0), d.get("power", 0)),
-            "money_range": (d.get("money", 0), d.get("money", 0)),
-        })
+    def from_dict(cls, d, tile_size=32):
+        """Create a WanderingMonster-like object from a dict."""
+        inst = cls(
+            d.get("x", 0),
+            d.get("y", 0),
+            template={
+                "name": d.get("name"),
+                "description": d.get("description"),
+                "health_range": (d.get("health", 0), d.get("health", 0)),
+                "power_range": (d.get("power", 0), d.get("power", 0)),
+                "money_range": (d.get("money", 0), d.get("money", 0)),
+            },
+            tile_size=tile_size
+        )
         # override fields with stored values (so we preserve randomized stats)
         inst.health = d.get("health", inst.health)
         inst.power = d.get("power", inst.power)
@@ -88,27 +127,23 @@ class WanderingMonster:
         return inst
 
     @staticmethod
-    def random_at(grid_size, town_pos, avoid_positions=None):
-        """Create a random monster at a location that does not clash with town or avoid_positions."""
+    def random_at(grid_size, town_pos, avoid_positions=None, tile_size=32):
+        """Create a random monster at a location avoiding town/blocked spaces."""
         if avoid_positions is None:
             avoid_positions = []
 
-        # attempt random placements until valid
-        attempts = 0
-        while attempts < 200:
+        for _ in range(200):
             x = random.randint(0, grid_size - 1)
             y = random.randint(0, grid_size - 1)
+
             if (x, y) == tuple(town_pos):
-                attempts += 1
                 continue
             if (x, y) in [tuple(p) for p in avoid_positions]:
-                attempts += 1
                 continue
-            # build monster
-            m = WanderingMonster(x, y)
-            return m
-        # fallback: place at bottom-right if nothing else
-        return WanderingMonster(grid_size - 1, grid_size - 1)
+
+            return WanderingMonster(x, y, tile_size=tile_size)
+
+        return WanderingMonster(grid_size - 1, grid_size - 1, tile_size=tile_size)
 
     def move(self, grid_size, town_pos, player_pos, occupied_positions=None):
         """
